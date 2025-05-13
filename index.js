@@ -1,30 +1,34 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const { Connection, clusterApiUrl } = require("@solana/web3.js");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 
-// Example endpoint to trigger bot logic
-app.post('/start', async (req, res) => {
-    const { action, walletAddress } = req.body;
-    console.log(`Received bot trigger from ${walletAddress} with action ${action}`);
+// ✅ Connect to Solana Mainnet
+const connection = new Connection(clusterApiUrl("mainnet-beta"), "confirmed");
 
-    // Simulate response (actual bot logic will be plugged in)
-    res.json({
-        message: `Bot started for wallet ${walletAddress}`,
-        status: "success"
-    });
-});
-
+// ✅ Health check route
 app.get("/", (req, res) => {
-    res.send("Solana Bot Backend is Running!");
+  res.send("✅ Solana bot backend is live.");
 });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+// ✅ Test Solana connection route
+app.get("/solana-ping", async (req, res) => {
+  try {
+    const version = await connection.getVersion();
+    res.json({ status: "Connected", version });
+  } catch (err) {
+    res.status(500).json({ error: "Solana connection failed", details: err.message });
+  }
+});
+
+// 🔁 You can add more routes here later for trading, prices, etc.
+
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
 });
