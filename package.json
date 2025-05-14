@@ -11,6 +11,6 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "@solana/web3.js": "^1.94.2",
-    "axios": "^0.27.2"  // <-- Added axios for making API requests
+    "axios": "^0.27.2"
   }
 }
