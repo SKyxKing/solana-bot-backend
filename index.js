@@ -1,73 +1,71 @@
 const express = require('express');
-const axios = require('axios'); // This is the dependency we'll use for API calls
-const { Connection, PublicKey } = require('@solana/web3.js'); // For Solana Blockchain interaction
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const axios = require('axios');
+const { Connection, PublicKey } = require('@solana/web3.js');
 
 const app = express();
 const port = process.env.PORT || 10000;
 
-app.use(express.json());
+// Middlewares
+app.use(cors());
+app.use(bodyParser.json());
 
-// Fetch Token Price (SOL, ETH, etc.) from CoinGecko
-async function getTokenPrice(symbol) {
-  try {
-    const response = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
-    return response.data[symbol] ? response.data[symbol].usd : null; // USD price of token
-  } catch (error) {
-    console.error('Error fetching price:', error);
-    return null;
-  }
-}
+// Solana connection
+const connection = new Connection('https://api.mainnet-beta.solana.com');
 
-// Fetch Solana Wallet Balance
-async function getSolanaBalance(walletAddress) {
-  const connection = new Connection('https://api.mainnet-beta.solana.com');
+// Function to fetch wallet balance
+async function getWalletBalance(walletAddress) {
   try {
     const publicKey = new PublicKey(walletAddress);
     const balance = await connection.getBalance(publicKey);
     return balance / 1e9; // Convert lamports to SOL
-  } catch (err) {
-    console.error("Error fetching Solana balance:", err);
+  } catch (error) {
+    console.error('Error fetching wallet balance:', error);
     return null;
   }
 }
 
-// API Endpoint to fetch wallet balance and token price
-app.get("/wallet-balance", async (req, res) => {
+// Function to fetch the current price of SOL from CoinGecko API
+async function getTokenPrice() {
+  try {
+    const response = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+    return response.data.solana.usd;
+  } catch (error) {
+    console.error('Error fetching token price:', error);
+    return null;
+  }
+}
+
+// Endpoint to fetch wallet balance and token price
+app.get('/wallet-balance', async (req, res) => {
   const { walletAddress, token } = req.query;
 
   if (!walletAddress || !token) {
-    return res.status(400).json({ error: "Wallet address and token are required" });
+    return res.status(400).json({ error: 'Missing walletAddress or token parameter' });
   }
 
-  // Fetch balance (only supporting SOL for now)
-  let balance;
-  if (token.toUpperCase() === 'SOL') {
-    balance = await getSolanaBalance(walletAddress);
-  } else {
-    return res.status(400).json({ error: "Unsupported token" });
+  try {
+    const balance = await getWalletBalance(walletAddress);
+    const price = await getTokenPrice();
+
+    if (balance === null || price === null) {
+      return res.status(500).json({ error: 'Failed to fetch data' });
+    }
+
+    // Send the wallet balance and token price as the response
+    res.json({
+      balance,
+      price,
+      totalValue: balance * price, // Total value of the wallet in USD
+    });
+  } catch (error) {
+    console.error('Error in /wallet-balance endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  if (balance === null) {
-    return res.status(500).json({ error: "Failed to fetch wallet balance" });
-  }
-
-  // Fetch price from CoinGecko
-  const price = await getTokenPrice(token.toLowerCase());
-  if (!price) {
-    return res.status(500).json({ error: "Failed to fetch token price" });
-  }
-
-  const totalValue = balance * price;
-
-  res.json({
-    walletAddress,
-    balance,
-    price,
-    totalValue,
-  });
 });
 
-// Start server
+// Starting the server
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
