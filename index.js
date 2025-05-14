@@ -27,7 +27,7 @@ const getWalletBalance = async (walletAddress) => {
   }
 };
 
-// Function to get token price from an API (e.g., Jupiter API)
+// Function to get token price from an API (Jupiter API)
 const getTokenPrice = async () => {
   try {
     const response = await axios.get('https://quote-api.jup.ag/v6/price?ids=So11111111111111111111111111111111111111112');
@@ -55,7 +55,6 @@ app.get('/wallet-balance', async (req, res) => {
   }
 
   try {
-    // Get the balance and price
     const balance = await getWalletBalance(walletAddress);
     const price = await getTokenPrice();
 
@@ -66,11 +65,48 @@ app.get('/wallet-balance', async (req, res) => {
     res.json({
       balance,
       price,
-      totalValue: balance * price, // Total value of the wallet in USD
+      totalValue: balance * price,
     });
   } catch (error) {
     console.error('Error in /wallet-balance endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 🔥 NEW: Get dynamic crypto info from CoinGecko (e.g., BTC, ETH, etc.)
+app.get('/crypto-info', async (req, res) => {
+  const { coinId } = req.query;
+
+  if (!coinId) {
+    return res.status(400).json({ error: 'Missing coinId query parameter' });
+  }
+
+  try {
+    const priceRes = await axios.get(`https://api.coingecko.com/api/v3/simple/price`, {
+      params: {
+        ids: coinId,
+        vs_currencies: 'usd',
+      },
+    });
+
+    const chartRes = await axios.get(`https://api.coingecko.com/api/v3/coins/${coinId}/market_chart`, {
+      params: {
+        vs_currency: 'usd',
+        days: '7', // Last 7 days of data
+      },
+    });
+
+    const price = priceRes.data[coinId]?.usd ?? null;
+    const chart = chartRes.data?.prices ?? [];
+
+    if (price === null || chart.length === 0) {
+      return res.status(500).json({ error: 'Failed to retrieve crypto info from CoinGecko' });
+    }
+
+    res.json({ price, chart });
+  } catch (error) {
+    console.error('Error fetching CoinGecko data:', error.message);
+    res.status(500).json({ error: 'Failed to fetch CoinGecko data' });
   }
 });
 
